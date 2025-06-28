@@ -2,27 +2,28 @@
 
 namespace App\Http\Controllers\Api\v1;
 
+use App\Actions\Auth\ChangePasswordAction;
+use App\Actions\Auth\ForgotPasswordAction;
+use App\Actions\Auth\LoginAction;
+use App\Actions\Auth\RegisterAction;
+use App\Actions\Auth\ResendVerificationTokenAction;
+use App\Actions\Auth\ResetPasswordAction;
+use App\Actions\Auth\VerifyEmailAction;
+use App\Data\Actions\Auth\ChangePasswordData;
+use App\Data\Actions\Auth\ForgotPasswordData;
+use App\Data\Actions\Auth\LoginData;
+use App\Data\Actions\Auth\RegisterData;
+use App\Data\Actions\Auth\ResendVerificationTokenData;
+use App\Data\Actions\Auth\ResetPasswordData;
+use App\Data\Actions\Auth\VerifyEmailData;
 use App\Enums\ResponseCodeEnum;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\v1\Auth\ChangePasswordRequest;
-use App\Http\Requests\Api\v1\Auth\ForgotPasswordRequest;
-use App\Http\Requests\Api\v1\Auth\LoginRequest;
-use App\Http\Requests\Api\v1\Auth\RegisterRequest;
-use App\Http\Requests\Api\v1\Auth\ResendVerificationTokenRequest;
-use App\Http\Requests\Api\v1\Auth\ResetPasswordRequest;
-use App\Http\Requests\Api\v1\Auth\VerifyEmailRequest;
-
+use App\Models\User;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Redirect;
-use Illuminate\Support\Str;
-use Symfony\Component\HttpFoundation\RedirectResponse as HttpFoundationRedirectResponse;
 use Throwable;
-use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
@@ -43,7 +44,7 @@ class AuthController extends Controller
     {
         auth()->logout();
 
-        return $this->successResponse(['message' => 'Successfully logged out']);
+        return $this->codeResponse();
     }
 
     public function refresh(): JsonResponse
@@ -51,72 +52,56 @@ class AuthController extends Controller
         return $this->respondWithToken();
     }
 
-    protected function respondWithToken(): JsonResponse
+    protected function respondWithToken(Authenticatable|User $user): JsonResponse
     {
-        return response()->json(
+        return $this->successResponse(
             [
-                'access_token' =>
-                    [
-                        'aud' => 'http://localhost:8080',
-                        'sub' => (string)auth()->user()->id,
-                        'iss' => 'http://auth/api/auth/login',
-                        'jti' => Str::uuid(),
-                    ]
+                'user' => $user->toArray(),
+                'token' => $user->createToken('auth_token')->accessToken,
             ]
         );
     }
 
-    /**
-     * @throws Throwable
-     */
-    public function register(RegisterRequest $request): JsonResponse
+    public function register(RegisterData $data): JsonResponse
     {
-        $userDto = $request->toDto();
+        $user = RegisterAction::run($data);
 
-        return $this->successResponse();
+        return $this->respondWithToken($user);
     }
 
-    public function login(LoginRequest $request): JsonResponse
+    public function login(LoginData $data): JsonResponse
     {
-        $credentials = $request->validated();
-
-        if (!auth()->attempt($credentials)) {
+        if (!LoginAction::run($data)) {
             return $this->codeResponse(ResponseCodeEnum::UNAUTHORIZED);
         }
 
-        if (!auth()->user()?->hasVerifiedEmail()) {
+        if (!Auth::user()->email_verified_at) {
             return $this->codeResponse(ResponseCodeEnum::NOT_VERIFIED_EMAIL);
         }
 
-        return $this->respondWithToken();
+        return $this->respondWithToken(
+            Auth::user()
+        );
     }
 
-    public function resendVerificationToken(ResendVerificationTokenRequest $request): JsonResponse
+    public function resendVerificationToken(ResendVerificationTokenData $data): JsonResponse
     {
-        if (($user = $this->userRepository->getByEmail($request->getEmail())) && !$user->hasVerifiedEmail()) {
-            $user->sendEmailVerificationNotification();
+        if (!ResendVerificationTokenAction::run($data)) {
+            return $this->codeResponse(ResponseCodeEnum::NOT_FOUND);
+        }
 
+        return $this->codeResponse();
+    }
+
+    public function verifyEmail(VerifyEmailData $data): JsonResponse
+    {
+        if (VerifyEmailAction::run($data)) {
             return $this->successResponse();
         }
 
-        return $this->codeResponse(ResponseCodeEnum::NOT_FOUND);
-    }
-
-    public function verifyEmail(VerifyEmailRequest $request): JsonResponse
-    {
-        if (($user = $this->userRepository->getByEmail($request->get('email'))) && !$user->hasVerifiedEmail()) {
-            try {
-                $this->userService->setUser($user)->verifyEmail($request->get('code'));
-
-                return $this->successResponse();
-            } catch (CodeInvalidException) {
-                return $this->codeResponse(
-                    code: ResponseCodeEnum::CODE_INVALID
-                );
-            }
-        }
-
-        return $this->errorResponse(code: ResponseCodeEnum::NOT_FOUND);
+        return $this->codeResponse(
+            code: ResponseCodeEnum::CODE_INVALID
+        );
     }
 
     public function broadcastingChannel(Request $request): JsonResponse
@@ -127,7 +112,7 @@ class AuthController extends Controller
 
         return response()->json(
             [
-                'auth' => config('broadcasting.connections.pusher.key') . ":" . hash_hmac(
+                'auth' => config('broadcasting.connections.pusher.key').":".hash_hmac(
                         'sha256',
                         $string,
                         config('broadcasting.connections.pusher.secret')
@@ -136,27 +121,9 @@ class AuthController extends Controller
         );
     }
 
-    public function externalAuthAccountLogin(ExternalAuthProviderNameEnum $resolver
-    ): HttpFoundationRedirectResponse|JsonResponse {
-        return $this->successResponse([
-            'auth_url' => $this->externalAuthResolver->initiate($resolver)->auth()->getTargetUrl()
-        ]);
-    }
-
-    public function externalAuthAccountCallback(ExternalAuthProviderNameEnum $resolver): JsonResponse|RedirectResponse
+    public function changePassword(ChangePasswordData $data): JsonResponse
     {
-        $user = $this->externalAuthResolver->initiate($resolver)->callback();
-
-        return Redirect::to(
-            route('auth.external.callback', [
-                'token' => JWTAuth::fromUser($user)
-            ])
-        );
-    }
-
-    public function changePassword(ChangePasswordRequest $request): JsonResponse
-    {
-        $this->userService->setUser(Auth::user())->setPassword($request->get('new_password'), true);
+        ChangePasswordAction::run($data);
 
         return $this->successResponse();
     }
@@ -164,49 +131,21 @@ class AuthController extends Controller
     /**
      * @throws Throwable
      */
-    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
+    public function forgotPassword(ForgotPasswordData $data): JsonResponse
     {
-        Verification::make()->checkBlacklist(
-            UserDataEnum::EMAIL,
-            $request->get('email')
-        );
-
-        if (!$user = $this->userRepository->getByEmail($request->get('email'))) {
+        if (!ForgotPasswordAction::run($data)) {
             return $this->codeResponse(ResponseCodeEnum::NOT_FOUND);
         }
 
-        $token = $this->userService->setUser($user)->createVerificationCode(
-            VerificationCodeTypeEnum::PASSWORD_RESET, [
-                'email' => $request->get('email'),
-                'user_id' => $user->id,
-            ]
-        )->getVerificationCode();
-
-        Mail::to($request->get('email'))->send(new ForgotPassword($token));
-
         return $this->successResponse();
     }
 
-    public function resetPassword(ResetPasswordRequest $request): JsonResponse
+    public function resetPassword(ResetPasswordData $data): JsonResponse
     {
-        if (!$this->verificationCodeRepository->checkUnusedCodeExists(
-            VerificationCodeTypeEnum::PASSWORD_RESET,
-            $request->get('token')
-        )) {
+        if (!ResetPasswordAction::run($data)) {
             return $this->codeResponse(ResponseCodeEnum::CODE_INVALID);
         }
 
-        $tokenData = $request->getTokenData();
-
-        $user = $this->userRepository->getByEmailAndId(
-            data_get($tokenData, 'user_id'),
-            data_get($tokenData, 'email')
-        );
-
-        $this->userService->setUser($user)->setPassword($request->get('new_password'), true);
-
         return $this->successResponse();
     }
-
-
 }

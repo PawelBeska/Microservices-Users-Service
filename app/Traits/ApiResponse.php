@@ -30,7 +30,7 @@ trait ApiResponse
         );
     }
 
-    public function codeResponse(ResponseCodeEnum $code): JsonResponse
+    public function codeResponse(ResponseCodeEnum $code = ResponseCodeEnum::OK): JsonResponse
     {
         return response()->json(
             [
