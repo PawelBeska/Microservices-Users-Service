@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\VerificationTokenTypeEnum;
+use Database\Factories\VerificationTokenFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read  User $user
  * @method static Builder|VerificationToken isValid(string $token, VerificationTokenTypeEnum $type)
+ * @method static VerificationTokenFactory factory(int $count = 1)
  */
 class VerificationToken extends Model
 {

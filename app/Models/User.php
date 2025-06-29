@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,6 +17,9 @@ use Laravel\Passport\HasApiTokens;
  * @property string $password
  * @property \Illuminate\Support\Carbon|null $email_verified_at
  * @property string|null $remember_token
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @method static UserFactory factory(int $count = 1)
  */
 class User extends Authenticatable implements MustVerifyEmail
 {

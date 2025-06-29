@@ -9,8 +9,8 @@ return new class extends Migration {
     {
         Schema::create('verification_tokens', static function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained('users');
-            $table->string('token')->unique();
+            $table->foreignUuid('user_id')->constrained('users');
+            $table->string('token');
             $table->string('type')->index();
             $table->timestamp('expires_at')->nullable();
             $table->timestamps();

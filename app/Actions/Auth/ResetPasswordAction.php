@@ -4,8 +4,8 @@ namespace App\Actions\Auth;
 
 use App\Data\Actions\Auth\ResetPasswordData;
 use App\Enums\VerificationTokenTypeEnum;
-use App\Models\User;
 use App\Models\VerificationToken;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class ResetPasswordAction
@@ -14,17 +14,23 @@ class ResetPasswordAction
 
     public function handle(ResetPasswordData $data): bool
     {
-        /** @var User $user */
-        #!TODO implement user lookup by password reset token
-        $user = VerificationToken::isValid($data->token, VerificationTokenTypeEnum::PASSWORD_RESET)->first()?->user;
+        try {
+            /** @var VerificationToken $token */
+            $token = VerificationToken::isValid($data->token, VerificationTokenTypeEnum::PASSWORD_RESET)->firstOrFail();
+            $user = $token->user;
 
-        if (!$user) {
+            if (!$user) {
+                return false;
+            }
+
+            $user->password = $data->password;
+            $user->save();
+
+            $token->delete();
+
+            return true;
+        } catch (ModelNotFoundException) {
             return false;
         }
-
-        $user->password = $data->password;
-        $user->save();
-
-        return true;
     }
 }

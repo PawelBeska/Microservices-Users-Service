@@ -3,7 +3,9 @@
 namespace App\Actions\Auth;
 
 use App\Data\Actions\Auth\VerifyEmailData;
-use App\Models\User;
+use App\Enums\VerificationTokenTypeEnum;
+use App\Models\VerificationToken;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class VerifyEmailAction
@@ -12,17 +14,22 @@ class VerifyEmailAction
 
     public function handle(VerifyEmailData $data): bool
     {
-        $user = User::query()->where('email', $data->email)->first();
-        #!TODO - Check if the token is valid
+        try {
+            /** @var VerificationToken $verificationToken */
+            $verificationToken = VerificationToken::isValid($data->token, VerificationTokenTypeEnum::EMAIL_VERIFICATION)->firstOrFail();
+            $user = $verificationToken->user;
 
+            if (!$user->hasVerifiedEmail()) {
+                $user->markEmailAsVerified();
 
-        if ($user?->hasVerifiedEmail()) {
-            $user->markEmailAsVerified();
+                $verificationToken->delete();
+                return true;
+            }
 
-            return true;
+            return false;
+        } catch (ModelNotFoundException) {
+            return false;
         }
-
-        return false;
     }
 
 }
