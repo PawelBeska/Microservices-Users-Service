@@ -25,9 +25,18 @@ enum ResponseCodeEnum: int
 
     case NOT_VERIFIED_EMAIL = 1001;
 
-    case POST_LIMIT_EXCEEDED = 1002;
-    case PHONE_NUMBER_ALREADY_VERIFIED = 1003;
-    case EMAIL_ALREADY_VERIFIED = 1004;
-    case DATA_ON_BLACKLIST = 1005;
+    public function httpCode(): int
+    {
+        return match ($this) {
+            self::OK => 200,
+            self::BAD_REQUEST, self::NOT_VERIFIED_EMAIL, self::CODE_INVALID => 400,
+            self::UNAUTHORIZED => 401,
+            self::FORBIDDEN => 403,
+            self::NOT_FOUND => 404,
+            self::VALIDATION_ERROR => 422,
+            self::TOO_MANY_REQUESTS => 429,
+            self::EXCEPTION => 500,
+        };
+    }
 
 }

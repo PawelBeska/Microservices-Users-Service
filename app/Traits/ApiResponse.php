@@ -35,7 +35,8 @@ trait ApiResponse
         return response()->json(
             [
                 'code' => $code->value
-            ]
+            ],
+            $code->httpCode()
         );
     }
 
