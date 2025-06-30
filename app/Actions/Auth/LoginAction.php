@@ -10,10 +10,10 @@ class LoginAction
 {
     use AsAction;
 
-    public function handle(LoginData $data): bool
+    public function handle(LoginData $data): bool|string
     {
-        if (Auth::attempt($data->toArray())) {
-            return true;
+        if ($token = Auth::attempt($data->toArray())) {
+            return $token;
         }
 
         return false;

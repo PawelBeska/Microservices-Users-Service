@@ -24,6 +24,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Throwable;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
@@ -49,38 +50,47 @@ class AuthController extends Controller
 
     public function refresh(): JsonResponse
     {
-        return $this->respondWithToken();
+        return $this->respondWithToken(
+            JWTAuth::user(),
+            Auth::refresh()
+        );
     }
 
-    protected function respondWithToken(Authenticatable|User $user): JsonResponse
+    protected function respondWithToken(Authenticatable|User $user, string $token): JsonResponse
     {
         return $this->successResponse(
             [
-                'user' => $user->toArray(),
-                'token' => $user->createToken('auth_token')->accessToken,
+                'user' => $user,
+                'token' => $token,
             ]
         );
     }
 
     public function register(RegisterData $data): JsonResponse
     {
-        $user = RegisterAction::run($data);
+        RegisterAction::run($data);
 
-        return $this->respondWithToken($user);
+        return $this->successResponse();
     }
 
     public function login(LoginData $data): JsonResponse
     {
-        if (!LoginAction::run($data)) {
+        $token = LoginAction::run($data);
+
+        if (!$token) {
             return $this->codeResponse(ResponseCodeEnum::UNAUTHORIZED);
         }
 
-        if (!Auth::user()->email_verified_at) {
+        /** @var User|null $user */
+        $user = JWTAuth::user();
+
+        if (!$user->email_verified_at) {
             return $this->codeResponse(ResponseCodeEnum::NOT_VERIFIED_EMAIL);
         }
 
         return $this->respondWithToken(
-            Auth::user()
+            $user,
+            $token
         );
     }
 
@@ -125,7 +135,7 @@ class AuthController extends Controller
     {
         ChangePasswordAction::run($data);
 
-        return $this->successResponse();
+        return $this->codeResponse();
     }
 
     /**
@@ -137,7 +147,7 @@ class AuthController extends Controller
             return $this->codeResponse(ResponseCodeEnum::NOT_FOUND);
         }
 
-        return $this->successResponse();
+        return $this->codeResponse();
     }
 
     public function resetPassword(ResetPasswordData $data): JsonResponse
@@ -146,6 +156,6 @@ class AuthController extends Controller
             return $this->codeResponse(ResponseCodeEnum::CODE_INVALID);
         }
 
-        return $this->successResponse();
+        return $this->codeResponse();
     }
 }

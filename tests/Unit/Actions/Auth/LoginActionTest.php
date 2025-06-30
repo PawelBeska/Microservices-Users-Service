@@ -24,7 +24,7 @@ class LoginActionTest extends TestCase
 
         $result = LoginAction::run($loginData);
 
-        $this->assertTrue($result);
+        $this->assertNotFalse($result);
         $this->assertAuthenticatedAs($user);
     }
 
