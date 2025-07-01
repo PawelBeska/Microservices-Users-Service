@@ -52,6 +52,12 @@ class User extends Authenticatable implements MustVerifyEmail, JWTSubject
                     'admin',
                 ],
                 'permissions' => [],
+                'service' => [
+                    'name' => config('microservices.name'),
+                    'host' => config('microservices.host'),
+                    'port' => config('microservices.port'),
+                    'service' => config('microservices.service'),
+                ],
                 ...$this->toArray()
             ],
         ];

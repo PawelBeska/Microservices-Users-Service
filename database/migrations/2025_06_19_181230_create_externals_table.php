@@ -6,20 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
+
     public function up(): void
     {
-        Schema::create('externals', function (Blueprint $table) {
+        Schema::create('externals', static function (Blueprint $table) {
             $table->id();
-            $table->timestamps();
+            $table->foreignId('service_id')
+                ->constrained('services')
+                ->cascadeOnDelete()
+                ->cascadeOnUpdate();
+            $table->string('external_id')->comment('ID of the external service')->index();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('externals');
