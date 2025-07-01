@@ -17,6 +17,7 @@
     "laravel/tinker": "^2.10.1",
     "lorisleiva/laravel-actions": "^2.9",
     "spatie/laravel-data": "^4.17",
+    "spatie/laravel-permission": "^6.20",
     "tymon/jwt-auth": "^2.2"
   },
   "require-dev": {
